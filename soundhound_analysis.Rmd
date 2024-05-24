@@ -1,0 +1,102 @@
+---
+title: "Sound Hound Stock Price Analysis"
+author: "Brandon Chan"
+date: "2024-05-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, include=FALSE}
+library(tidyverse) 
+```
+
+```{r, include=FALSE}
+sh <- read_csv("stock_csv\\SOUN.csv")
+sh
+```
+## Stock Price Time Series 
+```{r}
+timeseries <- ggplot(sh, aes(x=Date, y=`Adj Close`)) + geom_line(color="blue") + labs(title="Sound Hound Stock Price is Highly Volatile",x="Date", y="Adjusted Close Price") + theme(panel.background=element_rect(fill="white"), axis.line = element_line(color="black"), panel.grid = element_line(colour="grey", linetype = "dashed"), plot.title = element_text(size=18)) + scale_y_continuous(breaks=seq(0, 14, 2), labels = seq(0, 14, 2)) + geom_smooth(method = 'lm', colour='red')
+
+suppressMessages(print(timeseries))
+```
+
+The red line represents the linear regression (trend) line. 
+
+## Calculating Price Predictions 
+```{r}
+sh <- sh %>% mutate(`Date_Numeric` = as.numeric(`Date`))
+model <- lm(`Adj Close`~`Date_Numeric`, sh)
+price_estimate <- round(predict(model, newdata=data.frame(`Date_Numeric` = as.numeric(as.Date("2024-05-06")))), 2)
+curr_price <- sh[sh['Date_Numeric'] == as.numeric(as.Date("2024-05-06")),"Adj Close"]
+difference <- abs(price_estimate - curr_price) 
+comparison <- if(price_estimate > curr_price) "greater" else "less"
+
+# suppressMessages({
+sprintf("The estimated stock price is $% s.", price_estimate) 
+sprintf("This estimate is $% s % s than the true price $% s.", difference, comparison, curr_price)
+# })
+```
+The linear regression model predicts the current stock price to be lower. However, this trend is based on historical data and may not be completely indicative of future price. 
+
+## Using Volume as an Indicator of Share Price 
+```{r}
+volume_timeseries <- ggplot(sh, aes(x=Date, y=`Volume`)) + geom_line(color="blue") + labs(title="Trading Volume Spike in Recent Months",x="Date", y="Volume") + theme(panel.background=element_rect(fill="white"), axis.line = element_line(color="black"), plot.title = element_text(size=18)) + geom_smooth(method = 'lm', colour='red')
+
+suppressMessages(print(volume_timeseries))
+```
+
+Sound Hound stock has definitely been having an abnormally high volume of trades as of late. Something about the stock seems to interest people.   
+
+## Price change on high volume trading days
+```{r}
+Vol_IQR <- IQR(as.numeric(unlist(sh["Volume"])), na.rm=FALSE, type=7)
+high_vol <- sh[sh["Volume"] > Vol_IQR*10,]
+hv_avg_price <- round(mean(unlist(high_vol["Adj Close"])), 2) 
+agg_avg_price <- round(mean(unlist(sh["Adj Close"])), 2)
+change <- round(abs(hv_avg_price - agg_avg_price), 2)
+comparison <- if(hv_avg_price > agg_avg_price) "greater" else "less" 
+
+sprintf("On high volume trading days (> %s trades), the average share price is $%s.", Vol_IQR*10, hv_avg_price) 
+sprintf("This is $%s %s than the overall average price, which is $%s.", change, comparison, agg_avg_price) 
+```
+So share price tends to be higher on days with high trading volume. 
+
+## Open Versus Close Price 
+```{r}
+sh <- sh %>% mutate(open_close_diff = `Close` - `Open`)
+ggplot(sh) + geom_boxplot(aes(x=`open_close_diff`)) + labs(title="Many Significant Daily Price Changes", x = "Daily Price Change") + scale_y_continuous(breaks=NULL) + scale_x_continuous(breaks=seq(-4, 4, 1)) + theme(panel.background=element_rect(fill="white"), axis.line = element_line(color="black"), panel.grid = element_line(colour = "grey", linetype = "dashed"), plot.title = element_text(size = 18))
+
+```
+
+Each dot represents an outlier in the daily price change. On some days, the price changed almost $4. That's more than the average value of the entire stock price!  
+
+## Average Daily Price Change 
+```{r}
+avg_daily_change <- round(mean(unlist(sh["Close"] - sh["Open"])), 2)
+high_vol_change <- round(mean(unlist(high_vol["Close"] - high_vol["Open"])), 2) 
+comp_avg <- if(avg_daily_change > 0) "up" else "down"
+compy_high <- if(high_vol_change > 0) "up" else "down"
+max_diff <- round(max(sh["Close"] - sh["Open"]), 2) 
+min_diff <- round(min(sh["Close"] - sh["Open"]), 2) 
+
+sprintf("On average, the stock price goes %s $%s in a single day.", comp_avg, abs(avg_daily_change))  
+sprintf("But interestingly, the price goes %s $%s on average for days with high trade volume.", compy_high, abs(high_vol_change)) 
+sprintf("The highest price increase in a single day is $%s", max_diff)
+sprintf("The most a price has fallen in a single day is $%s", abs(min_diff))
+```
+
+## Conclusions 
+The frequent fluctuations in Sound Hound stock price make it ideal for trading in the short term, given the correct timing. However, I don't see it as a buy and hold investment - the stock price has generally declined since the company's inception and its technology does not appear to me as particularly unique. OpenAI is just too far ahead of the curve in terms of AI voice recognition/conversational capabilities. I could be wrong though, maybe companies like OpenAI and Google aren't interested in expanding into the same markets. 
+
+
+
+
+
+
+
+
+
